@@ -1,101 +1,132 @@
-import Image from "next/image";
+'use client'
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { useRef } from "react";
+import { utils, read } from 'xlsx';
+import { unparse } from 'papaparse';
+import { Check } from "lucide-react";
+
+interface User{
+  NOME: string,
+  TELEFONE: string
+}
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const turmaRef = useRef<HTMLInputElement | null>(null);
+  const planilhaRef = useRef<HTMLInputElement | null>(null);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  function click(){
+    const turmaValue = turmaRef.current?.value
+    const turma = 'T' + turmaValue
+    const file = planilhaRef.current?.files?.[0]
+
+    if(!file && !turmaValue){
+      alert('Erro: O arquivo XLSX e número de turma não foram informados.')
+      return
+    }
+
+    if(!turmaValue){
+      alert('Erro: O número da turma não foi informada.')
+      return
+    }
+
+    if(!file){
+      alert('Erro: O arquivo XLSX não foi informado.')
+      return
+    }
+    
+    if (file) {
+      const reader = new FileReader();
+      reader.readAsArrayBuffer(file as Blob);
+
+      reader.onload = (e) => {
+        const bufferArray = e.target?.result;
+        const workbook = read(bufferArray, { type: "buffer" });
+
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+
+        const jsonData: User[] = utils.sheet_to_json(sheet);
+
+        const data = [
+          ['First Name','Mobile Phone']
+        ];
+
+        jsonData.map((row: User) => {
+          const nome = row.NOME;
+          const tel = row.TELEFONE;
+          const nomeFormatado = formatNameWithClass(nome, turma);
+          data.push([nomeFormatado, tel])
+        })
+        const csv = unparse(data);
+        downloadCSV(csv);
+      };
+    }
+  }
+
+  function formatNameWithClass(name: string, turma: string): string {
+    // Quebra a string pelo espaço para separar o nome e sobrenome
+    const nameParts = name.split(" ");
+    
+    // Pega o primeiro nome e o último sobrenome
+    const firstName = nameParts[0];
+    const lastName = nameParts[nameParts.length - 1];
+  
+    // Retorna a string formatada com o nome, sobrenome e turma
+    const nameComplete = `${firstName} ${lastName} ${turma}`
+    return nameComplete;
+  }
+
+  const downloadCSV = (csv: string) => {
+  const today = new Date();
+
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0'); // Janeiro é 0!
+  const day = String(today.getDate()).padStart(2, '0');
+
+  const currentDate = `${year}-${month}-${day}`;
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `contatos-${currentDate}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    // const a2 = document.createElement('a');
+    // a2.href = 'https://contacts.google.com/'
+    // document.body.appendChild(a2);
+    // a2.click();
+    // document.body.removeChild(a2);
+  };
+
+  return (
+    <Card className="w-[350px] mx-auto">
+    <CardHeader>
+      <CardTitle>Lista de Contatos</CardTitle>
+      <CardDescription>Crie uma lista de contatos apartir de uma planilha Excel.</CardDescription>
+    </CardHeader>
+    <CardContent>
+      <form>
+        <div className="grid w-full items-center gap-4">
+          <div className="flex flex-col space-y-1.5">
+            <Label htmlFor="turma">Turma</Label>
+            <Input id="turma" placeholder="Qual número da turma?" type="number" ref={turmaRef}/>
+          </div>
+          <div className="flex flex-col space-y-1.5">
+            <Label htmlFor="file">Planilha</Label>
+            <Input id="file" type="file" accept=".xlsx" ref={planilhaRef}/>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+      </form>
+    </CardContent>
+    <CardFooter className="flex justify-center">
+      <Button type="submit" onClick={click}><Check/>Enviar</Button>
+    </CardFooter>
+  </Card>
   );
 }
